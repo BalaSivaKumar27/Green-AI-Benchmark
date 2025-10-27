@@ -201,6 +201,13 @@ async def load_uploaded_dataset(dataset_id: str):
     
     return X, y
 
+def calculate_green_score(accuracy: float, energy: float, time: float, alpha: float = 0.1) -> float:
+    """Calculate Green Score: accuracy / (energy + alpha * time)"""
+    denominator = energy + (alpha * time)
+    if denominator == 0:
+        return 0.0
+    return round((accuracy / denominator) * 100, 2)
+
 # API Routes
 @api_router.get("/")
 async def root():
@@ -209,19 +216,116 @@ async def root():
 @api_router.get("/datasets/list", response_model=List[DatasetInfo])
 async def list_datasets():
     """Get list of available datasets"""
-    return DATASETS
+    # Get pre-defined datasets
+    all_datasets = DATASETS.copy()
+    
+    # Add uploaded datasets
+    uploaded = await db.uploaded_datasets.find({}, {"_id": 0, "id": 1, "name": 1, "samples": 1, "features": 1}).to_list(100)
+    for dataset in uploaded:
+        all_datasets.append({
+            "name": dataset["id"],
+            "description": f"Uploaded: {dataset['name']} ({dataset['samples']} samples, {dataset['features']} features)",
+            "samples": dataset["samples"],
+            "features": dataset["features"]
+        })
+    
+    return all_datasets
+
+@api_router.post("/datasets/upload", response_model=DatasetUploadResponse)
+async def upload_dataset(file: UploadFile = File(...), target_column: str = "target"):
+    """Upload a custom dataset (CSV file)"""
+    try:
+        # Read CSV file
+        contents = await file.read()
+        df = pd.read_csv(io.BytesIO(contents))
+        
+        # Validate target column
+        if target_column not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Target column '{target_column}' not found in dataset")
+        
+        # Encode categorical target if needed
+        le = LabelEncoder()
+        if df[target_column].dtype == 'object':
+            df[target_column] = le.fit_transform(df[target_column])
+        
+        # Generate dataset ID
+        dataset_id = str(uuid.uuid4())
+        
+        # Store in database
+        dataset_doc = {
+            "id": dataset_id,
+            "name": file.filename,
+            "samples": len(df),
+            "features": len(df.columns) - 1,
+            "target_column": target_column,
+            "data": df.to_dict('records'),
+            "uploaded_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.uploaded_datasets.insert_one(dataset_doc)
+        
+        return DatasetUploadResponse(
+            dataset_id=dataset_id,
+            name=file.filename,
+            samples=len(df),
+            features=len(df.columns) - 1,
+            target_column=target_column
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading dataset: {str(e)}")
+
+@api_router.get("/models/list")
+async def list_models():
+    """Get list of available models"""
+    return {"models": list(AVAILABLE_MODELS.keys())}
 
 @api_router.post("/models/run", response_model=ModelMetric)
 async def run_model(request: ModelRunRequest):
     """Run a model on a dataset and return metrics"""
     try:
-        metrics = simulate_model_run(request.model, request.dataset)
+        # Load dataset
+        try:
+            X, y = load_dataset_from_db(request.dataset)
+        except:
+            # Try loading as uploaded dataset
+            X, y = await load_uploaded_dataset(request.dataset)
+        
+        # Encode categorical features if needed
+        for col in X.columns:
+            if X[col].dtype == 'object':
+                le = LabelEncoder()
+                X[col] = le.fit_transform(X[col].astype(str))
+        
+        # Handle missing values
+        X = X.fillna(X.mean())
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.3, random_state=42
+        )
+        
+        # Train and evaluate
+        metrics = train_and_evaluate_model(
+            request.model, X_train, X_test, y_train, y_test
+        )
+        
+        # Calculate Green Score
+        green_score = calculate_green_score(
+            metrics["accuracy"],
+            metrics["energy_kWh"],
+            metrics["train_time_s"]
+        )
         
         # Create ModelMetric object
         result = ModelMetric(
             model=request.model,
             dataset=request.dataset,
-            **metrics
+            accuracy=round(metrics["accuracy"], 4),
+            energy_kWh=round(metrics["energy_kWh"], 6),
+            carbon_kg=round(metrics["carbon_kg"], 6),
+            train_time_s=round(metrics["train_time_s"], 2),
+            inference_time_s=round(metrics["inference_time_s"], 4),
+            green_score=green_score
         )
         
         # Store in database
