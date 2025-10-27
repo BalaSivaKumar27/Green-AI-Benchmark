@@ -181,24 +181,113 @@ const Analyze = () => {
           Analyze Models
         </h1>
 
+        {/* Dataset Upload Section */}
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 shadow-sm border border-blue-200 mb-8">
+          <h2 className="text-xl font-semibold text-slate-800 mb-6 flex items-center">
+            <Upload className="w-5 h-5 mr-2" />
+            Upload Custom Dataset
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <Label htmlFor="file-upload" className="block text-sm font-medium text-slate-700 mb-2">
+                CSV File
+              </Label>
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="w-full"
+                data-testid="file-upload"
+              />
+              {uploadFile && (
+                <p className="text-sm text-slate-600 mt-2">Selected: {uploadFile.name}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="target-column" className="block text-sm font-medium text-slate-700 mb-2">
+                Target Column Name
+              </Label>
+              <Input
+                id="target-column"
+                type="text"
+                value={targetColumn}
+                onChange={(e) => setTargetColumn(e.target.value)}
+                placeholder="target"
+                className="w-full"
+                data-testid="target-column-input"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={uploadDataset}
+            disabled={uploading || !uploadFile}
+            className="mt-4 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
+            data-testid="upload-dataset-btn"
+          >
+            {uploading ? (
+              <div className="spinner mx-auto" style={{ width: 20, height: 20, borderWidth: 2 }} />
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Dataset
+              </>
+            )}
+          </Button>
+        </div>
+
         {/* Control Panel */}
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 mb-8">
           <h2 className="text-xl font-semibold text-slate-800 mb-6">Run Benchmark</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Model</label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger data-testid="model-select">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS.map(model => (
-                    <SelectItem key={model} value={model} data-testid={`model-option-${model}`}>
-                      {model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!showCustomModel ? (
+                <div className="flex gap-2">
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger data-testid="model-select" className="flex-1">
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map(model => (
+                        <SelectItem key={model} value={model} data-testid={`model-option-${model}`}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowCustomModel(true)}
+                    title="Add custom model"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                    placeholder="Enter model name"
+                    className="flex-1"
+                    data-testid="custom-model-input"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setShowCustomModel(false);
+                      setCustomModel("");
+                    }}
+                    title="Back to list"
+                  >
+                    ×
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -217,7 +306,7 @@ const Analyze = () => {
               </Select>
             </div>
 
-            <div className="flex items-end gap-2">
+            <div className="md:col-span-2 flex items-end gap-2">
               <Button
                 onClick={runBenchmark}
                 disabled={loading}
@@ -229,7 +318,7 @@ const Analyze = () => {
                 ) : (
                   <>
                     <Play className="w-4 h-4 mr-2" />
-                    Run
+                    Run Benchmark
                   </>
                 )}
               </Button>
