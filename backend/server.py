@@ -43,6 +43,13 @@ api_router = APIRouter(prefix="/api")
 class ModelRunRequest(BaseModel):
     model: str
     dataset: str
+    
+class DatasetUploadResponse(BaseModel):
+    dataset_id: str
+    name: str
+    samples: int
+    features: int
+    target_column: str
 
 class ModelMetric(BaseModel):
     model_config = ConfigDict(extra="ignore")
