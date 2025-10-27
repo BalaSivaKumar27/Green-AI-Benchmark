@@ -87,78 +87,119 @@ DATASETS = [
     {"name": "Wine Quality", "description": "Wine quality classification (1599 samples, 11 features)", "samples": 1599, "features": 11}
 ]
 
-# Simulated model configurations with realistic metrics
-MODEL_CONFIGS = {
-    "RandomForest": {
-        "Iris": {"accuracy": 0.96, "energy_base": 0.008, "train_time_base": 2.5, "inference_time": 0.15},
-        "MNIST": {"accuracy": 0.92, "energy_base": 0.45, "train_time_base": 45, "inference_time": 2.1},
-        "Energy Efficiency": {"accuracy": 0.89, "energy_base": 0.012, "train_time_base": 3.2, "inference_time": 0.18},
-        "Wine Quality": {"accuracy": 0.87, "energy_base": 0.022, "train_time_base": 5.8, "inference_time": 0.25}
-    },
-    "LightGBM": {
-        "Iris": {"accuracy": 0.94, "energy_base": 0.006, "train_time_base": 1.8, "inference_time": 0.12},
-        "MNIST": {"accuracy": 0.91, "energy_base": 0.35, "train_time_base": 32, "inference_time": 1.5},
-        "Energy Efficiency": {"accuracy": 0.92, "energy_base": 0.009, "train_time_base": 2.4, "inference_time": 0.14},
-        "Wine Quality": {"accuracy": 0.89, "energy_base": 0.018, "train_time_base": 4.5, "inference_time": 0.20}
-    },
-    "MLP": {
-        "Iris": {"accuracy": 0.95, "energy_base": 0.015, "train_time_base": 8.5, "inference_time": 0.22},
-        "MNIST": {"accuracy": 0.97, "energy_base": 1.2, "train_time_base": 120, "inference_time": 3.5},
-        "Energy Efficiency": {"accuracy": 0.88, "energy_base": 0.025, "train_time_base": 12, "inference_time": 0.28},
-        "Wine Quality": {"accuracy": 0.86, "energy_base": 0.045, "train_time_base": 18, "inference_time": 0.35}
-    },
-    "CNN": {
-        "Iris": {"accuracy": 0.93, "energy_base": 0.25, "train_time_base": 25, "inference_time": 0.45},
-        "MNIST": {"accuracy": 0.99, "energy_base": 2.8, "train_time_base": 280, "inference_time": 6.5},
-        "Energy Efficiency": {"accuracy": 0.85, "energy_base": 0.35, "train_time_base": 32, "inference_time": 0.55},
-        "Wine Quality": {"accuracy": 0.84, "energy_base": 0.48, "train_time_base": 42, "inference_time": 0.68}
-    },
-    "DistilBERT": {
-        "Iris": {"accuracy": 0.91, "energy_base": 0.85, "train_time_base": 65, "inference_time": 1.2},
-        "MNIST": {"accuracy": 0.95, "energy_base": 8.5, "train_time_base": 850, "inference_time": 15},
-        "Energy Efficiency": {"accuracy": 0.82, "energy_base": 1.2, "train_time_base": 95, "inference_time": 1.8},
-        "Wine Quality": {"accuracy": 0.81, "energy_base": 1.5, "train_time_base": 120, "inference_time": 2.2}
-    }
+# Available ML models
+AVAILABLE_MODELS = {
+    "RandomForest": RandomForestClassifier,
+    "LogisticRegression": LogisticRegression,
+    "GradientBoosting": GradientBoostingClassifier,
+    "MLP": MLPClassifier,
+    "SVM": SVC,
+    "KNN": KNeighborsClassifier,
+    "DecisionTree": DecisionTreeClassifier
 }
 
-def calculate_green_score(accuracy: float, energy: float, time: float, alpha: float = 0.1) -> float:
-    """Calculate Green Score: accuracy / (energy + alpha * time)"""
-    denominator = energy + (alpha * time)
-    if denominator == 0:
-        return 0.0
-    return round((accuracy / denominator) * 100, 2)
+# Energy cost per second (simulated based on CPU usage)
+ENERGY_COST_PER_SECOND = 0.0001  # kWh per second at 100% CPU
+CARBON_INTENSITY = 0.5  # kg CO2 per kWh (average grid intensity)
 
-def simulate_model_run(model: str, dataset: str) -> dict:
-    """Simulate model training and return metrics"""
-    if model not in MODEL_CONFIGS:
-        raise ValueError(f"Model {model} not supported")
-    if dataset not in MODEL_CONFIGS[model]:
-        raise ValueError(f"Dataset {dataset} not available for {model}")
+def measure_training_energy(func):
+    """Decorator to measure energy consumption during training"""
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        start_cpu = psutil.cpu_percent(interval=0.1)
+        
+        result = func(*args, **kwargs)
+        
+        end_time = time.time()
+        end_cpu = psutil.cpu_percent(interval=0.1)
+        elapsed_time = end_time - start_time
+        avg_cpu = (start_cpu + end_cpu) / 2
+        
+        # Estimate energy based on CPU usage and time
+        energy_kWh = (avg_cpu / 100) * elapsed_time * ENERGY_COST_PER_SECOND
+        carbon_kg = energy_kWh * CARBON_INTENSITY
+        
+        return {
+            **result,
+            "train_time_s": elapsed_time,
+            "energy_kWh": energy_kWh,
+            "carbon_kg": carbon_kg
+        }
+    return wrapper
+
+@measure_training_energy
+def train_and_evaluate_model(model_name: str, X_train, X_test, y_train, y_test):
+    """Train a model and evaluate its performance"""
+    try:
+        # Get model class
+        if model_name in AVAILABLE_MODELS:
+            ModelClass = AVAILABLE_MODELS[model_name]
+        else:
+            # Try to use RandomForest as default for unknown models
+            ModelClass = RandomForestClassifier
+        
+        # Initialize and train model
+        if model_name == "MLP":
+            model = ModelClass(hidden_layer_sizes=(100,), max_iter=500, random_state=42)
+        elif model_name == "SVM":
+            model = ModelClass(kernel='rbf', random_state=42)
+        else:
+            model = ModelClass(random_state=42)
+        
+        model.fit(X_train, y_train)
+        
+        # Predict and evaluate
+        inference_start = time.time()
+        y_pred = model.predict(X_test)
+        inference_time = time.time() - inference_start
+        
+        accuracy = accuracy_score(y_test, y_pred)
+        
+        return {
+            "accuracy": accuracy,
+            "inference_time_s": inference_time
+        }
+    except Exception as e:
+        raise ValueError(f"Error training model: {str(e)}")
+
+def load_dataset_from_db(dataset_name: str):
+    """Load a previously uploaded dataset or generate sample data"""
+    # For pre-defined datasets, generate sample data
+    if dataset_name == "Iris":
+        from sklearn.datasets import load_iris
+        data = load_iris()
+        return pd.DataFrame(data.data, columns=data.feature_names), pd.Series(data.target)
+    elif dataset_name == "Wine Quality":
+        from sklearn.datasets import load_wine
+        data = load_wine()
+        return pd.DataFrame(data.data, columns=data.feature_names), pd.Series(data.target)
+    elif dataset_name == "MNIST":
+        from sklearn.datasets import load_digits
+        data = load_digits()
+        return pd.DataFrame(data.data), pd.Series(data.target)
+    elif dataset_name == "Energy Efficiency":
+        # Generate synthetic data
+        np.random.seed(42)
+        X = pd.DataFrame(np.random.randn(768, 8), columns=[f"feature_{i}" for i in range(8)])
+        y = pd.Series(np.random.randint(0, 3, 768))
+        return X, y
+    else:
+        raise ValueError(f"Dataset {dataset_name} not found")
+
+async def load_uploaded_dataset(dataset_id: str):
+    """Load an uploaded dataset from MongoDB"""
+    dataset_doc = await db.uploaded_datasets.find_one({"id": dataset_id}, {"_id": 0})
+    if not dataset_doc:
+        raise ValueError(f"Dataset {dataset_id} not found")
     
-    config = MODEL_CONFIGS[model][dataset]
+    # Reconstruct dataframe from stored data
+    df = pd.DataFrame(dataset_doc["data"])
+    target_column = dataset_doc["target_column"]
     
-    # Add some randomness to simulate real runs (±5%)
-    accuracy = config["accuracy"] + random.uniform(-0.02, 0.02)
-    accuracy = max(0.0, min(1.0, accuracy))  # Keep between 0 and 1
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
     
-    energy_kWh = config["energy_base"] * random.uniform(0.95, 1.05)
-    train_time_s = config["train_time_base"] * random.uniform(0.95, 1.05)
-    inference_time_s = config["inference_time"] * random.uniform(0.95, 1.05)
-    
-    # Calculate carbon footprint (using average grid intensity: 0.5 kg CO2/kWh)
-    carbon_kg = energy_kWh * 0.5
-    
-    # Calculate Green Score
-    green_score = calculate_green_score(accuracy, energy_kWh, train_time_s)
-    
-    return {
-        "accuracy": round(accuracy, 4),
-        "energy_kWh": round(energy_kWh, 4),
-        "carbon_kg": round(carbon_kg, 6),
-        "train_time_s": round(train_time_s, 2),
-        "inference_time_s": round(inference_time_s, 2),
-        "green_score": green_score
-    }
+    return X, y
 
 # API Routes
 @api_router.get("/")
