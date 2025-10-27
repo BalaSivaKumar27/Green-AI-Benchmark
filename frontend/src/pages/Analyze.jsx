@@ -1,27 +1,34 @@
 import { useState, useEffect } from "react";
-import { Play, Trash2, Download } from "lucide-react";
+import { Play, Trash2, Download, Upload, Plus } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import GreenScoreCard from "../components/GreenScoreCard";
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const MODELS = ["RandomForest", "LightGBM", "MLP", "CNN", "DistilBERT"];
-
 const Analyze = () => {
   const [datasets, setDatasets] = useState([]);
+  const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("");
+  const [customModel, setCustomModel] = useState("");
   const [selectedDataset, setSelectedDataset] = useState("");
   const [results, setResults] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [showCustomModel, setShowCustomModel] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [targetColumn, setTargetColumn] = useState("target");
 
   useEffect(() => {
     fetchDatasets();
+    fetchModels();
     fetchResults();
   }, []);
 
@@ -34,6 +41,17 @@ const Analyze = () => {
     }
   };
 
+  const fetchModels = async () => {
+    try {
+      const response = await axios.get(`${API}/models/list`);
+      setModels(response.data.models);
+    } catch (error) {
+      console.error("Error fetching models:", error);
+      // Fallback to default models
+      setModels(["RandomForest", "LogisticRegression", "GradientBoosting", "MLP", "SVM", "KNN", "DecisionTree"]);
+    }
+  };
+
   const fetchResults = async () => {
     try {
       const response = await axios.get(`${API}/results`);
@@ -43,8 +61,43 @@ const Analyze = () => {
     }
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setUploadFile(e.target.files[0]);
+    }
+  };
+
+  const uploadDataset = async () => {
+    if (!uploadFile) {
+      toast.error("Please select a file");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadFile);
+      formData.append("target_column", targetColumn);
+
+      const response = await axios.post(`${API}/datasets/upload?target_column=${targetColumn}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      toast.success(`Dataset uploaded: ${response.data.name}`);
+      setUploadFile(null);
+      setTargetColumn("target");
+      await fetchDatasets();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to upload dataset");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const runBenchmark = async () => {
-    if (!selectedModel || !selectedDataset) {
+    const modelToUse = showCustomModel ? customModel : selectedModel;
+    
+    if (!modelToUse || !selectedDataset) {
       toast.error("Please select both model and dataset");
       return;
     }
@@ -52,7 +105,7 @@ const Analyze = () => {
     setLoading(true);
     try {
       const response = await axios.post(`${API}/models/run`, {
-        model: selectedModel,
+        model: modelToUse,
         dataset: selectedDataset
       });
       
@@ -60,7 +113,7 @@ const Analyze = () => {
       toast.success(`Benchmark completed! Green Score: ${response.data.green_score}`);
       await fetchResults();
     } catch (error) {
-      toast.error("Benchmark failed");
+      toast.error(error.response?.data?.detail || "Benchmark failed");
     } finally {
       setLoading(false);
     }
