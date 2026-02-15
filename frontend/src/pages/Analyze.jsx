@@ -25,6 +25,7 @@ const Analyze = () => {
   const [showCustomModel, setShowCustomModel] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [targetColumn, setTargetColumn] = useState("target");
+  
 
   useEffect(() => {
     fetchDatasets();
@@ -36,19 +37,65 @@ const Analyze = () => {
     try {
       const response = await axios.get(`${API}/datasets/list`);
       setDatasets(response.data);
+      if (!selectedDataset && Array.isArray(response.data) && response.data.length > 0) {
+        setSelectedDataset(response.data[0].name);
+      }
     } catch (error) {
-      toast.error("Failed to fetch datasets");
+      console.warn("Failed to fetch datasets, using fallback list.");
+      // Fallback to a few default datasets if backend is unavailable
+      const fallback = [
+        { name: "Iris", description: "Iris flower classification", samples: 150, features: 4 },
+        { name: "Wine Quality", description: "Wine quality classification", samples: 1599, features: 11 },
+        { name: "Breast Cancer", description: "Cancer detection dataset", samples: 569, features: 30 },
+        { name: "MNIST", description: "Handwritten digit recognition", samples: 70000, features: 784 },
+      ];
+      setDatasets(fallback);
+      if (!selectedDataset && fallback.length > 0) {
+        setSelectedDataset(fallback[0].name);
+      }
     }
   };
 
+  
+
   const fetchModels = async () => {
     try {
-      const response = await axios.get(`${API}/models/list`);
-      setModels(response.data.models);
+      await axios.get(`${API}/models/list`);
+      const friendly = [
+        "LightGBM",
+        "Random Forest",
+        "K-Nearest Neighbors (KNN)",
+        "Bayesian Network",
+        "Support Vector Machine (SVM)",
+        "Logistic Regression / Linear Regression",
+        "Multi-Layer Perceptron (MLP)",
+        "Convolutional Neural Network (CNN)",
+        "XGBoost",
+        "DistilBERT",
+      ];
+      setModels(friendly);
+      if (!selectedModel && friendly.length > 0) {
+        setSelectedModel(friendly[0]);
+      }
     } catch (error) {
       console.error("Error fetching models:", error);
       // Fallback to default models
-      setModels(["RandomForest", "LogisticRegression", "GradientBoosting", "MLP", "SVM", "KNN", "DecisionTree"]);
+      const fallback = [
+        "LightGBM",
+        "Random Forest",
+        "K-Nearest Neighbors (KNN)",
+        "Bayesian Network",
+        "Support Vector Machine (SVM)",
+        "Logistic Regression / Linear Regression",
+        "Multi-Layer Perceptron (MLP)",
+        "Convolutional Neural Network (CNN)",
+        "XGBoost",
+        "DistilBERT",
+      ];
+      setModels(fallback);
+      if (!selectedModel && fallback.length > 0) {
+        setSelectedModel(fallback[0]);
+      }
     }
   };
 
@@ -236,6 +283,8 @@ const Analyze = () => {
           </Button>
         </div>
 
+        
+
         {/* Control Panel */}
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 mb-8">
           <h2 className="text-xl font-semibold text-slate-800 mb-6">Run Benchmark</h2>
@@ -338,6 +387,13 @@ const Analyze = () => {
                   >
                     <Download className="w-4 h-4" />
                   </Button>
+                  <Button
+                    onClick={() => window.open(`${API}/report.pdf`, "_blank")}
+                    variant="outline"
+                    title="Download PDF Report"
+                  >
+                    Download PDF Report
+                  </Button>
                 </>
               )}
             </div>
@@ -352,6 +408,62 @@ const Analyze = () => {
               model={latestResult.model}
               dataset={latestResult.dataset}
             />
+            {/* Confusion Matrix */}
+            {latestResult.confusion_matrix && latestResult.labels && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mt-6">
+                <h3 className="text-lg font-semibold mb-4">Confusion Matrix</h3>
+                <div className="overflow-auto">
+                  {/* Heatmap legend */}
+                  {(() => {
+                    const flat = latestResult.confusion_matrix.flat();
+                    const maxVal = Math.max(...flat, 1);
+                    const steps = 5;
+                    const stops = Array.from({ length: steps + 1 }, (_, i) => Math.round((i / steps) * maxVal));
+                    return (
+                      <div className="flex items-center gap-2 mb-3 text-xs text-slate-600">
+                        <span>Low</span>
+                        <div className="flex h-2 w-40 rounded overflow-hidden">
+                          {stops.map((_, i) => (
+                            <div key={i} className="flex-1" style={{ background: `rgba(16,185,129, ${(i / steps)})` }} />
+                          ))}
+                        </div>
+                        <span>High</span>
+                      </div>
+                    );
+                  })()}
+                  <table className="border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="p-2"></th>
+                        {latestResult.labels.map((l) => (
+                          <th key={l} className="p-2 text-sm text-slate-600">{l}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const flat = latestResult.confusion_matrix.flat();
+                        const maxVal = Math.max(...flat, 1);
+                        return latestResult.confusion_matrix.map((row, i) => (
+                        <tr key={i}>
+                          <th className="p-2 text-sm text-slate-600 font-medium">{latestResult.labels[i]}</th>
+                          {row.map((v, j) => (
+                            <td
+                              key={`${i}-${j}`}
+                              className="p-2 text-center border border-slate-200"
+                              style={{ background: `rgba(16,185,129, ${v > 0 ? (v / maxVal) : 0})` }}
+                            >
+                              {v}
+                            </td>
+                          ))}
+                        </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -406,21 +518,21 @@ const Analyze = () => {
             </div>
 
             {/* Bar Chart */}
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 h-[600px] w-[1280px]">
               <h2 className="text-xl font-semibold text-slate-800 mb-6">Top 10 Models by Green Score</h2>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={barData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <BarChart data={barData} margin={{ top: 20, right: 20, bottom: 20, left: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     dataKey="name"
-                    angle={-45}
+                    angle={340}
                     textAnchor="end"
                     height={100}
-                    stroke="#64748b"
+                    stroke="#000000"
                   />
                   <YAxis
-                    label={{ value: "Green Score", angle: -90, position: "insideLeft" }}
-                    stroke="#64748b"
+                    label={{ value: "Green Score", angle: -90, position: "insideLeft", margin: { right: 1000 } }}
+                    stroke="#000000"
                   />
                   <Tooltip
                     content={({ active, payload }) => {

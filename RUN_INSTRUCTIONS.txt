@@ -1,0 +1,121 @@
+═══════════════════════════════════════════════════════════════
+        🚀 HOW TO RUN GREEN AI BENCHMARK
+═══════════════════════════════════════════════════════════════
+
+METHOD 1: Double-Click (Easiest)
+═══════════════════════════════════════════════════════════════
+1. Double-click: start_all.bat
+2. Wait for it to check setup
+3. Two new windows will open:
+   - Backend Server (http://localhost:8000)
+   - Frontend Server (http://localhost:3000)
+4. Browser should open automatically
+5. If not, go to: http://localhost:3000
+
+
+METHOD 2: Manual Start (Two Terminals)
+═══════════════════════════════════════════════════════════════
+
+TERMINAL 1 - Backend:
+───────────────────────────────────────────────────────────────
+cd backend
+python server.py
+
+You'll see:
+  INFO:     Uvicorn running on http://0.0.0.0:8000
+
+
+TERMINAL 2 - Frontend:
+───────────────────────────────────────────────────────────────
+cd frontend
+npm start
+
+You'll see:
+  Compiled successfully!
+  webpack compiled successfully
+
+
+═══════════════════════════════════════════════════════════════
+                    WHAT WAS FIXED
+═══════════════════════════════════════════════════════════════
+
+ISSUE: start_all.bat wasn't working when double-clicked
+
+FIXES APPLIED:
+──────────────
+1. ✅ Added automatic MongoDB check
+2. ✅ Added .env file verification
+3. ✅ Added dependency installation checks
+4. ✅ Fixed directory paths (uses %~dp0 for reliability)
+5. ✅ Improved error messages
+6. ✅ Better path handling for Windows
+
+The batch file now:
+- Checks if MongoDB is running
+- Verifies setup files exist
+- Shows clear error messages if something is missing
+- Starts both servers in separate windows
+- Provides helpful URLs
+
+
+═══════════════════════════════════════════════════════════════
+                    TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+IF YOU GET: "backend\.env not found"
+─────────────────────────────────────
+Solution: Run this command in your terminal:
+  python setup.py
+
+
+IF YOU GET: "Frontend dependencies not installed"
+──────────────────────────────────────────────────
+Solution: Run these commands:
+  cd frontend
+  npm install --legacy-peer-deps
+
+
+IF YOU GET: "MongoDB may not be running"
+──────────────────────────────────────────
+Solution: Start MongoDB
+  - Open Services (services.msc)
+  - Find "MongoDB Server (MongoDB)"
+  - Click "Start"
+
+
+IF THE FRONTEND WON'T START
+───────────────────────────
+Solution: Clean reinstall
+  cd frontend
+  Remove-Item -Recurse -Force node_modules, package-lock.json
+  npm install --legacy-peer-deps
+  npm start
+
+
+═══════════════════════════════════════════════════════════════
+                   ACCESS URLS
+═══════════════════════════════════════════════════════════════
+
+Once both servers are running:
+
+Frontend App:     http://localhost:3000
+Backend API:      http://localhost:8000
+API Docs:         http://localhost:8000/docs
+
+
+═══════════════════════════════════════════════════════════════
+             ✅ READY TO RUN NOW!
+═══════════════════════════════════════════════════════════════
+
+Just double-click: start_all.bat
+
+The improved script will:
+1. Check MongoDB ✓
+2. Check setup files ✓
+3. Start backend server ✓
+4. Start frontend server ✓
+5. Show you the URLs ✓
+
+
+═══════════════════════════════════════════════════════════════
+
