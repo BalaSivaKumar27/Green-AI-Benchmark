@@ -39,7 +39,6 @@ from reportlab.lib.units import mm
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection (optional)
 mongo_url = os.getenv('MONGO_URL')
 db_name = os.getenv('DB_NAME', 'green_benchmark')
 client = None
@@ -52,13 +51,10 @@ if mongo_url:
         client = None
         db = None
 
-# Create the main app without a prefix
 app = FastAPI()
 
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Define Models
 class ModelRunRequest(BaseModel):
     model: str
     dataset: str
@@ -82,7 +78,6 @@ class ModelMetric(BaseModel):
     train_time_s: float
     inference_time_s: float
     green_score: float
-    # Additional metrics for detailed analysis
     confusion_matrix: Optional[List[List[int]]] = None
     labels: Optional[List[str]] = None
     classification_report: Optional[dict] = None
@@ -104,11 +99,9 @@ class Recommendation(BaseModel):
 
  
 
-# Generate 100+ diverse datasets
 def generate_datasets():
     datasets = []
     
-    # Classic real datasets
     datasets.extend([
         {"name": "Iris", "description": "Iris flower classification (150 samples, 4 features)", "samples": 150, "features": 4},
         {"name": "MNIST", "description": "Handwritten digit recognition (70k samples, 784 features)", "samples": 70000, "features": 784},
@@ -119,7 +112,6 @@ def generate_datasets():
         {"name": "Heart Disease", "description": "Heart disease prediction (303 samples, 13 features)", "samples": 303, "features": 13},
     ])
     
-    # Generate synthetic classification datasets
     np.random.seed(42)
     sizes = [100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000]
     feature_counts = [5, 8, 10, 12, 15, 20, 25, 30, 40, 50]
@@ -135,7 +127,7 @@ def generate_datasets():
     for dtype, n_classes, desc_prefix in dataset_types:
         for size in sizes:
             for n_features in feature_counts:
-                if n_features <= size // 10:  # Avoid too many features for small datasets
+                if n_features <= size // 10:
                     samples = random.randint(size - size//10, size + size//10)
                     features = random.randint(n_features - 3, n_features + 3)
                     dataset_name = f"{dtype}_{name_counter:03d}"
@@ -157,7 +149,6 @@ def generate_datasets():
 
 DATASETS = generate_datasets()
 
-# Available ML models (20+ models)
 AVAILABLE_MODELS = {
     "RandomForest": RandomForestClassifier,
     "LogisticRegression": LogisticRegression,
@@ -185,12 +176,11 @@ AVAILABLE_MODELS = {
     "GaussianProcess": GaussianProcessClassifier
 }
 
-# Conditionally add third-party models so they appear in the list, with graceful errors if missing
 try:
     from lightgbm import LGBMClassifier  # type: ignore
     AVAILABLE_MODELS["LightGBM"] = LGBMClassifier
 except Exception:
-    AVAILABLE_MODELS["LightGBM"] = None  # Will trigger a helpful error at runtime
+    AVAILABLE_MODELS["LightGBM"] = None
 
 try:
     from xgboost import XGBClassifier  # type: ignore
@@ -198,13 +188,11 @@ try:
 except Exception:
     AVAILABLE_MODELS["XGBoost"] = None
 
-# Placeholders for non-tabular or not-yet-implemented pipelines
 AVAILABLE_MODELS.setdefault("BayesianNetwork", None)
-AVAILABLE_MODELS.setdefault("LinearRegression", None)  # Regression model in a classification pipeline
+AVAILABLE_MODELS.setdefault("LinearRegression", None)
 AVAILABLE_MODELS.setdefault("CNN", None)
 AVAILABLE_MODELS.setdefault("DistilBERT", None)
 
-# Friendly name aliases from UI to backend canonical keys
 MODEL_ALIASES = {
     "Random Forest": "RandomForest",
     "K-Nearest Neighbors (KNN)": "KNN",
@@ -217,12 +205,10 @@ MODEL_ALIASES = {
     "Bayesian Network": "BayesianNetwork",
 }
 
-# Energy cost per second (simulated based on CPU usage)
-ENERGY_COST_PER_SECOND = 0.0001  # kWh per second at 100% CPU
-CARBON_INTENSITY = 0.5  # kg CO2 per kWh (average grid intensity)
+ENERGY_COST_PER_SECOND = 0.0001
+CARBON_INTENSITY = 0.5
 
 def measure_training_energy(func):
-    """Decorator to measure energy consumption during training"""
     def wrapper(*args, **kwargs):
         start_time = time.time()
         start_cpu = psutil.cpu_percent(interval=0.1)
@@ -234,7 +220,6 @@ def measure_training_energy(func):
         elapsed_time = end_time - start_time
         avg_cpu = (start_cpu + end_cpu) / 2
         
-        # Estimate energy based on CPU usage and time
         energy_kWh = (avg_cpu / 100) * elapsed_time * ENERGY_COST_PER_SECOND
         carbon_kg = energy_kWh * CARBON_INTENSITY
         
@@ -248,18 +233,13 @@ def measure_training_energy(func):
 
 @measure_training_energy
 def train_and_evaluate_model(model_name: str, X_train, X_test, y_train, y_test):
-    """Train a model and evaluate its performance"""
     try:
-        # Normalize friendly names
         model_name = MODEL_ALIASES.get(model_name, model_name)
-        # Get model class
         if model_name in AVAILABLE_MODELS:
             ModelClass = AVAILABLE_MODELS[model_name]
         else:
-            # Try to use RandomForest as default for unknown models
             ModelClass = RandomForestClassifier
         
-        # Handle special models and missing dependencies early with clear errors
         if model_name == "LightGBM" and ModelClass is None:
             raise ValueError("LightGBM is not available. Install it with: pip install lightgbm")
         if model_name == "XGBoost" and ModelClass is None:
@@ -273,7 +253,6 @@ def train_and_evaluate_model(model_name: str, X_train, X_test, y_train, y_test):
         if model_name == "DistilBERT":
             raise ValueError("DistilBERT requires a text/NLP pipeline, which is not implemented yet. Please choose another model.")
 
-        # Initialize and train model with specific configurations
         if model_name == "MLP":
             model = ModelClass(hidden_layer_sizes=(100,), max_iter=500, random_state=42)
         elif model_name == "SVM" or model_name == "NuSVM":
@@ -285,25 +264,20 @@ def train_and_evaluate_model(model_name: str, X_train, X_test, y_train, y_test):
         elif model_name == "PassiveAggressive":
             model = ModelClass(random_state=42, max_iter=1000)
         elif model_name == "GaussianProcess":
-            # GaussianProcessClassifier can be slow on large datasets
             model = ModelClass(random_state=42)
         else:
-            # For most models, use default with random_state
             try:
                 model = ModelClass(random_state=42)
             except TypeError:
-                # Some models don't support random_state
                 model = ModelClass()
         
         model.fit(X_train, y_train)
         
-        # Predict and evaluate
         inference_start = time.time()
         y_pred = model.predict(X_test)
         inference_time = time.time() - inference_start
         
         accuracy = accuracy_score(y_test, y_pred)
-        # Constrain accuracy to between 0.80 and 0.99 as requested
         try:
             if accuracy < 0.80:
                 accuracy = 0.80
@@ -311,9 +285,7 @@ def train_and_evaluate_model(model_name: str, X_train, X_test, y_train, y_test):
                 accuracy = 0.99
         except Exception:
             pass
-        # Build confusion matrix and classification report
         try:
-            # Determine label ordering from y_test unique values
             unique_labels = sorted(pd.Series(y_test).unique().tolist())
             cm = confusion_matrix(y_test, y_pred, labels=unique_labels)
             cls_report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
@@ -333,8 +305,6 @@ def train_and_evaluate_model(model_name: str, X_train, X_test, y_train, y_test):
         raise ValueError(f"Error training model: {str(e)}")
 
 def load_dataset_from_db(dataset_name: str):
-    """Load a previously uploaded dataset or generate sample data"""
-    # For pre-defined datasets, generate sample data
     if dataset_name == "Iris":
         from sklearn.datasets import load_iris
         data = load_iris()
@@ -348,7 +318,6 @@ def load_dataset_from_db(dataset_name: str):
         data = load_digits()
         return pd.DataFrame(data.data), pd.Series(data.target)
     elif dataset_name == "Energy Efficiency":
-        # Generate synthetic data
         np.random.seed(42)
         X = pd.DataFrame(np.random.randn(768, 8), columns=[f"feature_{i}" for i in range(8)])
         y = pd.Series(np.random.randint(0, 3, 768))
@@ -368,8 +337,6 @@ def load_dataset_from_db(dataset_name: str):
         y = pd.Series(np.random.randint(0, 2, 303))
         return X, y
     else:
-        # Generate synthetic dataset based on name pattern
-        # Find dataset in DATASETS list
         dataset_info = None
         for ds in DATASETS:
             if ds["name"] == dataset_name:
@@ -377,12 +344,10 @@ def load_dataset_from_db(dataset_name: str):
                 break
         
         if dataset_info:
-            # Generate synthetic data based on dataset info
-            np.random.seed(hash(dataset_name) % 1000)  # Consistent seed for same dataset
+            np.random.seed(hash(dataset_name) % 1000)
             samples = dataset_info["samples"]
             features = dataset_info["features"]
             
-            # Determine number of classes from name
             if "Binary" in dataset_name:
                 n_classes = 2
             elif "Multi-Class" in dataset_name:
@@ -392,7 +357,6 @@ def load_dataset_from_db(dataset_name: str):
             else:
                 n_classes = 3
             
-            # Generate features and target
             X = pd.DataFrame(
                 np.random.randn(samples, features),
                 columns=[f"feature_{i}" for i in range(features)]
@@ -404,14 +368,12 @@ def load_dataset_from_db(dataset_name: str):
             raise ValueError(f"Dataset {dataset_name} not found")
 
 async def load_uploaded_dataset(dataset_id: str):
-    """Load an uploaded dataset from MongoDB"""
     if db is None:
         raise ValueError("Uploaded datasets are unavailable because the database is not configured.")
     dataset_doc = await db.uploaded_datasets.find_one({"id": dataset_id}, {"_id": 0})
     if not dataset_doc:
         raise ValueError(f"Dataset {dataset_id} not found")
     
-    # Reconstruct dataframe from stored data
     df = pd.DataFrame(dataset_doc["data"])
     target_column = dataset_doc["target_column"]
     
@@ -421,24 +383,19 @@ async def load_uploaded_dataset(dataset_id: str):
     return X, y
 
 def calculate_green_score(accuracy: float, energy: float, time: float, alpha: float = 0.1) -> float:
-    """Calculate Green Score: accuracy / (energy + alpha * time)"""
     denominator = energy + (alpha * time)
     if denominator == 0:
         return 0.0
     return round((accuracy / denominator) * 100, 2)
 
-# API Routes
 @api_router.get("/")
 async def root():
     return {"message": "Green AI Benchmark API"}
 
 @api_router.get("/datasets/list", response_model=List[DatasetInfo])
 async def list_datasets():
-    """Get list of available datasets"""
-    # Get pre-defined datasets
     all_datasets = DATASETS.copy()
     
-    # Try to add uploaded datasets from DB if available
     if db is not None:
         try:
             uploaded = await db.uploaded_datasets.find({}, {"_id": 0, "id": 1, "name": 1, "samples": 1, "features": 1}).to_list(100)
@@ -450,32 +407,25 @@ async def list_datasets():
                     "features": dataset["features"]
                 })
         except Exception:
-            # Ignore DB errors and just return built-ins
             pass
     
     return all_datasets
 
 @api_router.post("/datasets/upload", response_model=DatasetUploadResponse)
 async def upload_dataset(file: UploadFile = File(...), target_column: str = "target"):
-    """Upload a custom dataset (CSV file)"""
     try:
-        # Read CSV file
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
         
-        # Validate target column
         if target_column not in df.columns:
             raise HTTPException(status_code=400, detail=f"Target column '{target_column}' not found in dataset")
         
-        # Encode categorical target if needed
         le = LabelEncoder()
         if df[target_column].dtype == 'object':
             df[target_column] = le.fit_transform(df[target_column])
         
-        # Generate dataset ID
         dataset_id = str(uuid.uuid4())
         
-        # Store in database
         dataset_doc = {
             "id": dataset_id,
             "name": file.filename,
@@ -500,47 +450,37 @@ async def upload_dataset(file: UploadFile = File(...), target_column: str = "tar
 
 @api_router.get("/models/list")
 async def list_models():
-    """Get list of available models"""
     return {"models": list(AVAILABLE_MODELS.keys())}
 
 @api_router.post("/models/run", response_model=ModelMetric)
 async def run_model(request: ModelRunRequest):
-    """Run a model on a dataset and return metrics"""
     try:
-        # Load dataset
         try:
             X, y = load_dataset_from_db(request.dataset)
         except:
-            # Try loading as uploaded dataset
             X, y = await load_uploaded_dataset(request.dataset)
         
-        # Encode categorical features if needed
         for col in X.columns:
             if X[col].dtype == 'object':
                 le = LabelEncoder()
                 X[col] = le.fit_transform(X[col].astype(str))
         
-        # Handle missing values
         X = X.fillna(X.mean())
         
-        # Split data
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.3, random_state=42
         )
         
-        # Train and evaluate
         metrics = train_and_evaluate_model(
             request.model, X_train, X_test, y_train, y_test
         )
         
-        # Calculate Green Score
         green_score = calculate_green_score(
             metrics["accuracy"],
             metrics["energy_kWh"],
             metrics["train_time_s"]
         )
         
-        # Create ModelMetric object
         result = ModelMetric(
             model=request.model,
             dataset=request.dataset,
@@ -555,7 +495,6 @@ async def run_model(request: ModelRunRequest):
             classification_report=metrics.get("classification_report")
         )
         
-        # Store in database if available
         try:
             if db is not None:
                 doc = result.model_dump()
@@ -574,7 +513,6 @@ async def run_model(request: ModelRunRequest):
 
 @api_router.get("/report")
 async def generate_report(dataset: Optional[str] = None, model: Optional[str] = None, download: bool = True, print: bool = False):
-    """Generate a simple HTML report for results, optionally filtered by dataset and/or model."""
     query = {}
     if dataset:
         query["dataset"] = dataset
@@ -583,7 +521,6 @@ async def generate_report(dataset: Optional[str] = None, model: Optional[str] = 
 
     results = await db.model_metrics.find(query, {"_id": 0}).to_list(10000)
 
-    # Build basic HTML report
     def cm_table(res):
         if not res.get("confusion_matrix") or not res.get("labels"):
             return "<em>No confusion matrix available</em>"
@@ -687,9 +624,7 @@ def _build_pdf_report(results: List[dict]) -> bytes:
         )
         story.extend([header, Spacer(1, 4)])
 
-        # Metrics table
-        metrics_data = [
-            ["Metric", "Value"],
+        metrics_data = [            ["Metric", "Value"],
             ["Accuracy", str(r.get("accuracy"))],
             ["Green Score", str(r.get("green_score"))],
             ["Energy (kWh)", str(r.get("energy_kWh"))],
@@ -715,7 +650,6 @@ def _build_pdf_report(results: List[dict]) -> bytes:
         ]))
         story.extend([metrics_tbl, Spacer(1, 8)])
 
-        # Confusion matrix table if available
         cm = r.get("confusion_matrix")
         labels = r.get("labels")
         if cm and labels:
@@ -748,7 +682,6 @@ def _build_pdf_report(results: List[dict]) -> bytes:
 
 @api_router.get("/report.pdf")
 async def generate_report_pdf(dataset: Optional[str] = None, model: Optional[str] = None):
-    """Generate a styled PDF report for results, optionally filtered by dataset and/or model."""
     query = {}
     if dataset:
         query["dataset"] = dataset
@@ -764,12 +697,10 @@ async def generate_report_pdf(dataset: Optional[str] = None, model: Optional[str
 
 @api_router.get("/results", response_model=List[ModelMetric])
 async def get_results():
-    """Get all benchmark results"""
     if db is None:
         return []
     results = await db.model_metrics.find({}, {"_id": 0}).to_list(1000)
     
-    # Convert ISO string timestamps back to datetime objects
     for result in results:
         if isinstance(result['timestamp'], str):
             result['timestamp'] = datetime.fromisoformat(result['timestamp'])
@@ -778,7 +709,6 @@ async def get_results():
 
 @api_router.delete("/results")
 async def clear_results():
-    """Clear all benchmark results"""
     if db is None:
         return {"deleted_count": 0}
     result = await db.model_metrics.delete_many({})

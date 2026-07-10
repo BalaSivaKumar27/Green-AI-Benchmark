@@ -42,7 +42,6 @@ const Analyze = () => {
       }
     } catch (error) {
       console.warn("Failed to fetch datasets, using fallback list.");
-      // Fallback to a few default datasets if backend is unavailable
       const fallback = [
         { name: "Iris", description: "Iris flower classification", samples: 150, features: 4 },
         { name: "Wine Quality", description: "Wine quality classification", samples: 1599, features: 11 },
@@ -79,7 +78,6 @@ const Analyze = () => {
       }
     } catch (error) {
       console.error("Error fetching models:", error);
-      // Fallback to default models
       const fallback = [
         "LightGBM",
         "Random Forest",
@@ -201,7 +199,6 @@ const Analyze = () => {
     toast.success("Results exported");
   };
 
-  // Prepare chart data
   const scatterData = results.map(r => ({
     x: r.energy_kWh,
     y: r.accuracy * 100,
@@ -228,7 +225,6 @@ const Analyze = () => {
           Analyze Models
         </h1>
 
-        {/* Dataset Upload Section */}
         <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 shadow-sm border border-blue-200 mb-8">
           <h2 className="text-xl font-semibold text-slate-800 mb-6 flex items-center">
             <Upload className="w-5 h-5 mr-2" />
@@ -285,7 +281,6 @@ const Analyze = () => {
 
         
 
-        {/* Control Panel */}
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 mb-8">
           <h2 className="text-xl font-semibold text-slate-800 mb-6">Run Benchmark</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

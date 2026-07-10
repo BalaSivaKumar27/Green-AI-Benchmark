@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-"""
-Verification script for Green AI Benchmark setup
-Checks if all dependencies and configurations are in place
-"""
 import os
 import sys
 from pathlib import Path
 import subprocess
 
 def check_python_version():
-    """Check if Python version is compatible"""
     print("Checking Python version...")
     version = sys.version_info
     if version.major == 3 and version.minor >= 8:
@@ -20,7 +14,6 @@ def check_python_version():
         return False
 
 def check_node_version():
-    """Check if Node.js is installed"""
     print("\nChecking Node.js...")
     try:
         result = subprocess.run(['node', '--version'], capture_output=True, text=True)
@@ -35,7 +28,6 @@ def check_node_version():
         return False
 
 def check_mongodb():
-    """Check if MongoDB is accessible"""
     print("\nChecking MongoDB connection...")
     try:
         result = subprocess.run(['mongosh', '--version'], capture_output=True, text=True)
@@ -45,14 +37,13 @@ def check_mongodb():
         else:
             print("[WARNING] MongoDB client not found (mongosh)")
             print("[INFO] MongoDB may still be running as a service")
-            return True  # Don't fail, MongoDB might still be running
+            return True
     except FileNotFoundError:
         print("[WARNING] mongosh not found")
         print("[INFO] MongoDB may still be running as a service")
         return True
 
 def check_backend_env():
-    """Check if backend .env file exists"""
     print("\nChecking backend/.env...")
     env_file = Path("backend/.env")
     if env_file.exists():
@@ -70,7 +61,6 @@ def check_backend_env():
         return False
 
 def check_frontend_env():
-    """Check if frontend .env file exists"""
     print("\nChecking frontend/.env...")
     env_file = Path("frontend/.env")
     if env_file.exists():
@@ -88,7 +78,6 @@ def check_frontend_env():
         return False
 
 def check_backend_dependencies():
-    """Check if backend dependencies are installed"""
     print("\nChecking backend dependencies...")
     try:
         import fastapi
@@ -109,7 +98,6 @@ def check_backend_dependencies():
     return True
 
 def check_frontend_dependencies():
-    """Check if frontend dependencies are installed"""
     print("\nChecking frontend dependencies...")
     node_modules = Path("frontend/node_modules")
     package_json = Path("frontend/package.json")
@@ -127,7 +115,6 @@ def check_frontend_dependencies():
     return True
 
 def check_server_entry():
-    """Check if server.py has entry point"""
     print("\nChecking backend/server.py entry point...")
     server_file = Path("backend/server.py")
     if not server_file.exists():
@@ -140,7 +127,7 @@ def check_server_entry():
         return True
     else:
         print("[WARNING] Server entry point may be missing")
-        return True  # Don't fail, it may work anyway
+        return True
 
 def main():
     print("=" * 50)
@@ -195,4 +182,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -4,7 +4,6 @@ import "@/index.css";
 import App from "@/App";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-// Suppress noisy ResizeObserver loop errors in development
 if (typeof window !== "undefined") {
   const original = console.error;
   console.error = function (...args) {
@@ -14,7 +13,6 @@ if (typeof window !== "undefined") {
     original.apply(console, args);
   };
 
-  // Prevent React error overlay from triggering on benign ResizeObserver loops
   window.addEventListener(
     "error",
     (e) => {
@@ -27,11 +25,10 @@ if (typeof window !== "undefined") {
     true
   );
 
-  // As a last resort, hide/remove dev overlays that may still appear
   const hideOverlay = () => {
     const ids = [
-      'webpack-dev-server-client-overlay', // webpack overlay id (div or iframe)
-      'react-error-overlay', // legacy react overlay id
+      'webpack-dev-server-client-overlay',
+      'react-error-overlay',
     ];
     ids.forEach((id) => {
       const el = document.getElementById(id);
@@ -40,14 +37,12 @@ if (typeof window !== "undefined") {
         el.remove?.();
       }
     });
-    // Also hide iframes with the same id
     const ifr = document.querySelector('iframe#webpack-dev-server-client-overlay');
     if (ifr) {
       ifr.style.display = 'none';
       ifr.remove?.();
     }
   };
-  // Try a few times during startup, then periodically
   hideOverlay();
   const overlayInterval = setInterval(hideOverlay, 500);
   setTimeout(() => clearInterval(overlayInterval), 5000);

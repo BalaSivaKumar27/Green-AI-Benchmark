@@ -44,7 +44,6 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Hero Section */}
         <div className="mb-12 animate-fade-in">
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-800 mb-4">
             Green AI <span className="gradient-text">Benchmark</span>
@@ -55,7 +54,6 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <MetricCard
             icon={Database}
@@ -87,7 +85,6 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 card-hover">
             <h3 className="text-xl font-semibold text-slate-800 mb-4">What is Green Score?</h3>

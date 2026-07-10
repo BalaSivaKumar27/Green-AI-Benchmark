@@ -1,21 +1,12 @@
-#!/usr/bin/env python3
-"""
-Setup script for Green AI Benchmark
-Creates necessary configuration files and provides setup instructions
-"""
 import os
 from pathlib import Path
 
 def create_backend_env():
-    """Create backend .env file"""
     backend_env = Path("backend/.env")
     backend_env.parent.mkdir(exist_ok=True)
     
-    content = """# MongoDB Connection
-MONGO_URL=mongodb://localhost:27017
+    content = """MONGO_URL=mongodb://localhost:27017
 DB_NAME=green_ai_benchmark
-
-# CORS Origins (comma-separated, use * for all origins)
 CORS_ORIGINS=http://localhost:3000
 """
     
@@ -24,7 +15,6 @@ CORS_ORIGINS=http://localhost:3000
     print("[OK] Created backend/.env")
 
 def create_frontend_env():
-    """Create frontend .env file"""
     frontend_env = Path("frontend/.env")
     frontend_env.parent.mkdir(exist_ok=True)
     
@@ -38,7 +28,6 @@ def create_frontend_env():
 def main():
     print("Setting up Green AI Benchmark...\n")
     
-    # Create .env files
     create_backend_env()
     create_frontend_env()
     
@@ -53,4 +42,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
