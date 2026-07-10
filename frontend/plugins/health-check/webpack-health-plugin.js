@@ -1,10 +1,7 @@
-// webpack-health-plugin.js
-// Webpack plugin that tracks compilation state and health metrics
-
 class WebpackHealthPlugin {
   constructor() {
     this.status = {
-      state: 'idle',           // idle, compiling, success, failed
+      state: 'idle',           
       errors: [],
       warnings: [],
       lastCompileTime: null,
