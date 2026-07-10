@@ -256,3 +256,9 @@ MongoDB is **optional**. If `MONGO_URL` is not set or the connection fails:
 - Benchmark results are not persisted between restarts
 - The `/api/results` endpoint returns an empty list
 - The app remains fully functional for running and viewing benchmarks in the current session
+
+---
+
+## License
+
+This project is open source. See `LICENSE` for details.
