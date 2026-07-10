@@ -1,19 +1,17 @@
-// babel-metadata-plugin.js
-// Babel plugin for JSX transformation - adds metadata to all elements
 const path = require("path");
 const fs = require("fs");
 
-// ───────────────────────────────────────────────────────────────────────────────
-// ===== Dynamic composite detection (auto-exclude) =====
+
+// Dynamic composite detection (auto-exclude)
 const EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
-const PROJECT_ROOT = path.resolve(__dirname, '../..'); // frontend root (../../ from plugins/visual-edits/)
+const PROJECT_ROOT = path.resolve(__dirname, '../..'); 
 const SRC_ALIAS = path.resolve(PROJECT_ROOT, "src");
 
-const RESOLVE_CACHE = new Map(); // key: fromFile::source -> absPath | null
-const FILE_AST_CACHE = new Map(); // absPath -> { ast, mtimeMs }
-const PORTAL_COMP_CACHE = new Map(); // key: absPath::exportName -> boolean
-const DYNAMIC_COMP_CACHE = new Map(); // key: absPath::exportName -> boolean
-const BINDING_DYNAMIC_CACHE = new WeakMap(); // node -> boolean
+const RESOLVE_CACHE = new Map();
+const FILE_AST_CACHE = new Map(); 
+const PORTAL_COMP_CACHE = new Map(); 
+const DYNAMIC_COMP_CACHE = new Map(); 
+const BINDING_DYNAMIC_CACHE = new WeakMap();
 
 function resolveImportPath(source, fromFile) {
   const cacheKey = `${fromFile}::${source}`;
@@ -74,7 +72,7 @@ function parseFileAst(absPath, parser) {
 function jsxNameOf(openingEl, t) {
   const n = openingEl?.name;
   if (t.isJSXIdentifier(n)) return n.name;
-  if (t.isJSXMemberExpression(n)) return n.property.name; // <X.Y>
+  if (t.isJSXMemberExpression(n)) return n.property.name; 
   return null;
 }
 
@@ -89,7 +87,7 @@ function isPortalishName(name, RADIX_ROOTS) {
 // Analyze a specific exported component in a file
 function fileExportHasPortals({
   absPath,
-  exportName, // string or "default"
+  exportName, 
   t,
   traverse,
   parser,
@@ -108,7 +106,7 @@ function fileExportHasPortals({
   }
 
   // Map local imports -> file paths for recursive checks
-  const importMap = new Map(); // localName -> { absPath, importName }
+  const importMap = new Map(); 
   traverse(ast, {
     ImportDeclaration(p) {
       const src = p.node.source.value;
@@ -316,12 +314,10 @@ function usageIsCompositePortal({
   return false;
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
 // Babel plugin for JSX transformation - adds metadata to all elements
 const babelMetadataPlugin = ({ types: t }) => {
   const fileNameCache = new Map();
-  const processedNodes = new WeakSet(); // Track processed nodes to prevent infinite loops
-
+  const processedNodes = new WeakSet(); 
   const ARRAY_METHODS = new Set([
     "map",
     "forEach",
@@ -335,7 +331,7 @@ const babelMetadataPlugin = ({ types: t }) => {
     "every",
   ]);
 
-  // ---------- helpers ----------
+  //  helpers
   const getName = (openingEl) => {
     const n = openingEl?.name;
     return t.isJSXIdentifier(n) ? n.name : null;
@@ -386,7 +382,7 @@ const babelMetadataPlugin = ({ types: t }) => {
         a.name.name.startsWith("x-"),
     );
 
-  // ⬇️ Add { markExcluded } option: when true, include x-excluded="true"
+  // Add { markExcluded } option: when true, include x-excluded="true"
   const insertMetaAttributes = (openingEl, attrsToAdd) => {
     if (!openingEl.attributes) openingEl.attributes = [];
     const spreadIndex = openingEl.attributes.findIndex((attr) =>
@@ -758,8 +754,6 @@ const babelMetadataPlugin = ({ types: t }) => {
   return {
     name: "element-metadata-plugin",
     visitor: {
-      // Wrap React components (capitalized JSX) with metadata divs,
-      // or stamp attributes when wrapping would break Radix/Floating-UI.
       JSXElement(jsxPath, state) {
         if (processedNodes.has(jsxPath.node)) return;
 
@@ -777,10 +771,10 @@ const babelMetadataPlugin = ({ types: t }) => {
           "Routes",
           "Switch",
           "Redirect",
-          "Navigate", // React Router
+          "Navigate", 
           "Fragment",
           "Suspense",
-          "StrictMode", // React built-ins
+          "StrictMode",
           "ErrorBoundary",
           "Provider",
           "Consumer",
@@ -822,7 +816,6 @@ const babelMetadataPlugin = ({ types: t }) => {
           "ContextMenuPortal",
           "Command",
           "CommandDialog",
-          // Triggers & measured bits
           "PopoverTrigger",
           "TooltipTrigger",
           "DropdownMenuTrigger",
@@ -835,7 +828,6 @@ const babelMetadataPlugin = ({ types: t }) => {
           "DrawerTrigger",
           "CommandInput",
           "Slot",
-          // icons (avoid wrapping)
           "X",
           "ChevronRight",
           "ChevronLeft",
@@ -869,7 +861,6 @@ const babelMetadataPlugin = ({ types: t }) => {
             ].includes(parentName) ||
             RADIX_ROOTS.has(parentName)
           ) {
-            // Don't wrap if direct child of strict parent (e.g., Route inside Routes, or Radix roots)
             return;
           }
         }
@@ -916,10 +907,7 @@ const babelMetadataPlugin = ({ types: t }) => {
             RADIX_ROOTS,
           });
         })();
-
-        // 🚫 If this element is a direct child of a Trigger/asChild/Slot,
-        // or itself a primitive/root, DO NOT WRAP — stamp x-* on the element itself
-        // and mark it with x-excluded="true".
+        
         if (
           hasProp(openingElement, "asChild") ||
           isPortalPrimitive(elementName) ||
@@ -935,7 +923,6 @@ const babelMetadataPlugin = ({ types: t }) => {
           return;
         }
 
-        // NEW: dynamic composite detection (e.g., DemoPopover renders Popover primitives)
         const compositePortal = usageIsCompositePortal({
           elementName,
           jsxPath,
@@ -947,7 +934,6 @@ const babelMetadataPlugin = ({ types: t }) => {
         });
 
         if (compositePortal) {
-          // Treat like a primitive/root: don't wrap; stamp + mark excluded
           pushMetaAttrs(
             openingElement,
             { normalizedPath, lineNumber, elementName, isDynamic },
@@ -955,8 +941,6 @@ const babelMetadataPlugin = ({ types: t }) => {
           );
           return;
         }
-
-        // ✅ Normal case: wrap with display: contents and preserve an existing key
         processedNodes.add(jsxPath.node);
 
         const keyAttr = openingElement.attributes?.find(
